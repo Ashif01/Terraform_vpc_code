@@ -1,0 +1,110 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+# Configure the AWS Provider
+provider "aws" {
+  region = "eu-west-2"
+}
+
+#default_vpc_creation
+resource "aws_vpc" "myvpc" {
+  cidr_block = "10.0.0.0/16"
+  tags = {
+    Name = "my-vpc"
+  }
+}
+
+resource "aws_internet_gateway" "myigw" {
+  vpc_id = aws_vpc.myvpc.id
+
+  tags = {
+    Name = "my-igw"
+  }
+}
+
+resource "aws_subnet" "publicsubnet" {
+  vpc_id     = aws_vpc.myvpc.id
+  cidr_block = "10.0.1.0/24"
+  availability_zone = "eu-west-2a"
+
+  tags = {
+    Name = "public-subnet"
+  }
+}
+
+
+resource "aws_subnet" "privatesubnet" {
+  vpc_id     = aws_vpc.myvpc.id
+  cidr_block = "10.0.2.0/24"
+  availability_zone = "eu-west-2b"
+
+  tags = {
+    Name = "private-subnet"
+  }
+}
+
+resource "aws_route_table" "pubrt" {
+  vpc_id = aws_vpc.myvpc.id
+
+  route {
+    cidr_block = "0.0.0.0/0"
+    gateway_id = aws_internet_gateway.myigw.id
+
+  }
+
+  tags = {
+    Name = "public-RT"
+  }
+}
+
+resource "aws_route_table_association" "pubrtassociate" {
+  subnet_id      = aws_subnet.publicsubnet.id
+  route_table_id = aws_route_table.pubrt.id
+}
+
+
+resource "aws_route_table" "prirt" {
+  vpc_id = aws_vpc.myvpc.id
+
+  tags = {
+    Name = "public-RT"
+  }
+}
+
+resource "aws_route_table_association" "prirtassociate" {
+  subnet_id      = aws_subnet.privatesubnet.id
+  route_table_id = aws_route_table.prirt.id
+}
+
+resource "aws_key_pair" "vpc" {
+  key_name   = "vpc-key"
+  public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQD3F6tyPEFEzV0LX3X8BsXdMsQz1x2cEikKDEY0aIj41qgxMCP/iteneqXSIFZBp5vizPvaoIR3Um9xK7PGoW8giupGn+EPuxIA4cDM4vzOqOkiMPhz5XK0whEjkVzTo4+S0puvDZuwIsdiW9mxhJc7tgBNL0cYlWSYVkz4G/fslNfRPW5mYAM49f4fhtxPb5ok4Q2Lg9dPKVHO/Bgeu5woMc7RY0p1ej6D4CKFE6lymSDJpW0YHX/wqE9+cfEauh7xZcG0q9t2ta6F6fmX0agvpFyZo8aFbXeUBr7osSCJNgvavWbM/06niWrOvYX2xwWdhXmXSrbX8ZbabVohBK41 email@example.com"
+}
+
+resource "aws_instance" "terrapub" {
+  ami = "ami-0eb260c4d5475b901"
+  instance_type = "t2.micro"
+  subnet_id = aws_subnet.publicsubnet.id
+  key_name = "vpc-key"
+  associate_public_ip_address = true
+
+  tags = {
+    Name = "terra-1"
+  }
+}
+
+resource "aws_instance" "terrapri" {
+  ami = "ami-0eb260c4d5475b901"
+  instance_type = "t2.micro"
+  subnet_id = aws_subnet.privatesubnet.id
+  key_name = "vpc-key"
+
+  tags = {
+    Name = "terra-2"
+  }
+}
